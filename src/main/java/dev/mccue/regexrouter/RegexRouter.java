@@ -1,4 +1,4 @@
-package dev.mccue.regex_router;
+package dev.mccue.regexrouter;
 
 import dev.mccue.rosie.Handler;
 import dev.mccue.rosie.IntoResponse;
