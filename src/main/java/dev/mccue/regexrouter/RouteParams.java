@@ -1,4 +1,4 @@
-package dev.mccue.regex_router;
+package dev.mccue.regexrouter;
 
 import java.util.Optional;
 
