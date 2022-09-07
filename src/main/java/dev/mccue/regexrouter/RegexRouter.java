@@ -99,8 +99,7 @@ public final class RegexRouter<Ctx> {
         }
     }
 
-
-    public Optional<IntoResponse> handlerForRequest(Request request) {
+    public Optional<IntoResponse> handleRequest(Request request) {
         for (final var mapping : this.mappings) {
             final var method = request.requestMethod();
             final var pattern = mapping.routePattern();
