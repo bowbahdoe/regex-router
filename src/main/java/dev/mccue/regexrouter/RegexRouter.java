@@ -29,10 +29,8 @@ import java.util.stream.Collectors;
  */
 public final class RegexRouter<Ctx> {
     private final List<Mapping<Ctx>> mappings;
-    private final Ctx ctx;
 
     private RegexRouter(Builder<Ctx> builder) {
-        this.ctx = builder.context;
         final var mappings = builder.mappings;
         this.mappings = new ArrayList<>();
         for (final var mapping : mappings) {
@@ -42,12 +40,8 @@ public final class RegexRouter<Ctx> {
         }
     }
 
-    public static Builder<?> builder() {
+    public static <Ctx> Builder<Ctx> builder() {
         return new Builder<>();
-    }
-
-    public static <Ctx> Builder<Ctx> builder(Ctx context) {
-        return new Builder<>(context);
     }
 
     public interface Handler {
@@ -99,14 +93,14 @@ public final class RegexRouter<Ctx> {
         }
     }
 
-    public Optional<IntoResponse> handleRequest(Request request) {
+    public Optional<IntoResponse> handle(Ctx ctx, Request request) {
         for (final var mapping : this.mappings) {
             final var method = request.requestMethod();
             final var pattern = mapping.routePattern();
             final var matcher = pattern.matcher(request.uri());
             if (method.equalsIgnoreCase(mapping.method) && matcher.matches()) {
                 return Optional.of(mapping.handler().handle(
-                        this.ctx,
+                        ctx,
                         new MatcherRouteParams(matcher),
                         request
                 ));
@@ -128,15 +122,9 @@ public final class RegexRouter<Ctx> {
 
     public static final class Builder<Ctx> {
         private final List<MappingWithMethods<Ctx>> mappings;
-        private final Ctx context;
 
         private Builder() {
-            this(null);
-        }
-
-        private Builder(Ctx context) {
             this.mappings = new ArrayList<>();
-            this.context = context;
         }
 
         public Builder<Ctx> addMapping(
