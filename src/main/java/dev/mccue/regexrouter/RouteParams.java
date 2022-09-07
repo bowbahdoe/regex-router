@@ -2,7 +2,7 @@ package dev.mccue.regexrouter;
 
 import java.util.Optional;
 
-public interface RouteParams {
+public sealed interface RouteParams permits RegexRouter.MatcherRouteParams {
     Optional<String> positionalParameter(int pos);
     Optional<String> namedParameter(String name);
 }

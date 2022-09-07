@@ -1,20 +1,13 @@
 package dev.mccue.regexrouter;
 
-import dev.mccue.rosie.Handler;
 import dev.mccue.rosie.IntoResponse;
 import dev.mccue.rosie.Request;
-import java.io.IOException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.EnumMap;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.eclipse.jetty.http.HttpMethod;
+import java.util.stream.Collectors;
 
 /**
  * Implementation of a Router that just does a linear scan through regexes.
@@ -34,20 +27,17 @@ import org.eclipse.jetty.http.HttpMethod;
  *
  * https://stackoverflow.com/questions/415580/regex-named-groups-in-java
  */
-public final class RegexRouter<Ctx> implements RequestRouter {
-    private final EnumMap<HttpMethod, List<Mapping<Ctx>>> lookups;
+public final class RegexRouter<Ctx> {
+    private final List<Mapping<Ctx>> mappings;
     private final Ctx ctx;
 
     private RegexRouter(Builder<Ctx> builder) {
         this.ctx = builder.context;
         final var mappings = builder.mappings;
-        this.lookups = new EnumMap<>(HttpMethod.class);
-        for (final var method : HttpMethod.values()) {
-            this.lookups.put(method, new ArrayList<>());
-        }
+        this.mappings = new ArrayList<>();
         for (final var mapping : mappings) {
             for (final var method : mapping.methods) {
-                this.lookups.get(method).add(new Mapping<>(mapping.routePattern(), mapping.handler()));
+                this.mappings.add(new Mapping<>(method.toLowerCase(), mapping.routePattern(), mapping.handler()));
             }
         }
     }
@@ -60,12 +50,16 @@ public final class RegexRouter<Ctx> implements RequestRouter {
         return new Builder<>(context);
     }
 
+    public interface Handler {
+        IntoResponse handle(Request request);
+    }
+
     public interface HandlerTakingContext<Ctx> {
-        IntoResponse handle(Ctx context, Request request) throws IOException;
+        IntoResponse handle(Ctx context, Request request);
     }
 
     public interface HandlerTakingContextAndRouteParams<Ctx> {
-        IntoResponse handle(Ctx context, RouteParams routeParams, Request request) throws IOException;
+        IntoResponse handle(Ctx context, RouteParams routeParams, Request request);
     }
 
     /**
@@ -74,7 +68,7 @@ public final class RegexRouter<Ctx> implements RequestRouter {
      * Makes the assumption that it takes ownership of the matcher and will be exposed only via
      * the interface, so the mutability of the matcher is not relevant.
      */
-    private record MatcherRouteParams(Matcher matcher) implements RouteParams {
+    record MatcherRouteParams(Matcher matcher) implements RouteParams {
         @Override
         public Optional<String> positionalParameter(int pos) {
             if (matcher.groupCount() > pos - 1 || pos < 0) {
@@ -105,29 +99,30 @@ public final class RegexRouter<Ctx> implements RequestRouter {
         }
     }
 
-    @Override
-    public Optional<Handler> handlerForRequest(Request request) {
-        final var lookup = this.lookups.get(request.requestMethod());
-        for (final var mapping : lookup) {
+
+    public Optional<IntoResponse> handlerForRequest(Request request) {
+        for (final var mapping : this.mappings) {
+            final var method = request.requestMethod();
             final var pattern = mapping.routePattern();
             final var matcher = pattern.matcher(request.uri());
-            if (matcher.matches()) {
-                return Optional.of(req -> mapping.handler().handle(
+            if (method.equalsIgnoreCase(mapping.method) && matcher.matches()) {
+                return Optional.of(mapping.handler().handle(
                         this.ctx,
                         new MatcherRouteParams(matcher),
-                        req)
-                );
+                        request
+                ));
             }
         }
         return Optional.empty();
     }
 
     private record Mapping<Ctx>(
+            String method,
             Pattern routePattern,
             HandlerTakingContextAndRouteParams<Ctx> handler
     ) {}
     private record MappingWithMethods<Ctx>(
-            EnumSet<HttpMethod> methods,
+            Set<String> methods,
             Pattern routePattern,
             HandlerTakingContextAndRouteParams<Ctx> handler
     ) {}
@@ -146,16 +141,16 @@ public final class RegexRouter<Ctx> implements RequestRouter {
         }
 
         public Builder<Ctx> addMapping(
-                HttpMethod method,
+                String method,
                 Pattern routePattern,
                 Handler handler
         ) {
-            this.addMapping(EnumSet.of(method), routePattern, handler);
+            this.addMapping(Set.of(method), routePattern, handler);
             return this;
         }
 
         public Builder<Ctx> addMapping(
-                EnumSet<HttpMethod> methods,
+                Set<String> methods,
                 Pattern routePattern,
                 Handler handler
         ) {
@@ -164,16 +159,16 @@ public final class RegexRouter<Ctx> implements RequestRouter {
         }
 
         public Builder<Ctx> addMapping(
-                HttpMethod method,
+                String method,
                 Pattern routePattern,
                 HandlerTakingContext<? super Ctx> handler
         ) {
-            this.addMapping(EnumSet.of(method), routePattern, handler);
+            this.addMapping(Set.of(method), routePattern, handler);
             return this;
         }
 
         public Builder<Ctx> addMapping(
-                EnumSet<HttpMethod> methods,
+                Set<String> methods,
                 Pattern routePattern,
                 HandlerTakingContext<? super Ctx> handler
         ) {
@@ -182,16 +177,16 @@ public final class RegexRouter<Ctx> implements RequestRouter {
         }
 
         public Builder<Ctx> addMapping(
-                HttpMethod method,
+                String method,
                 Pattern routePattern,
                 HandlerTakingContextAndRouteParams<? super Ctx> handler
         ) {
-            this.addMapping(EnumSet.of(method), routePattern, handler);
+            this.addMapping(Set.of(method), routePattern, handler);
             return this;
         }
 
         public Builder<Ctx> addMapping(
-                EnumSet<HttpMethod> methods,
+                Set<String> methods,
                 Pattern routePattern,
                 HandlerTakingContextAndRouteParams<? super Ctx> handler
         ) {
@@ -201,7 +196,9 @@ public final class RegexRouter<Ctx> implements RequestRouter {
 
             if (!methods.isEmpty()) {
                 this.mappings.add(new MappingWithMethods<>(
-                        EnumSet.copyOf(methods),
+                        methods.stream()
+                                .map(String::toLowerCase)
+                                .collect(Collectors.toUnmodifiableSet()),
                         routePattern,
                         handler::handle
                 ));
