@@ -1,5 +1,5 @@
 module dev.mccue.regexrouter {
-    requires dev.mccue.rosie;
+    requires transitive dev.mccue.rosie;
 
     exports dev.mccue.regexrouter;
 }
