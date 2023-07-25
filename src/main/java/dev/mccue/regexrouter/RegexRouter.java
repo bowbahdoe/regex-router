@@ -30,16 +30,20 @@ import java.util.stream.Collectors;
  * <ul>
  *     <li>Django runs through each URL pattern, in order, and stops at the first one that matches the requested URL, matching against path_info.</li>
  *     <li>Once one of the URL patterns matches, Django imports and calls the given view, which is a Python function (or a class-based view). The view gets passed the following arguments:</li>
- *     <ul>
- *         <li>An instance of HttpRequest.</li>
- *         <li>If the matched URL pattern contained no named groups, then the matches from the regular expression are provided as positional arguments.</li>
- *         <li>The keyword arguments are made up of any named parts matched by the path expression that are provided, overridden by any arguments specified in the optional kwargs argument to django.urls.path() or django.urls.re_path().</li>
- *     </ul>
+ *     <li>
+ *         <ul>
+ *            <li>An instance of HttpRequest.</li>
+ *            <li>If the matched URL pattern contained no named groups, then the matches from the regular expression are provided as positional arguments.</li>
+ *            <li>The keyword arguments are made up of any named parts matched by the path expression that are provided, overridden by any arguments specified in the optional kwargs argument to django.urls.path() or django.urls.re_path().</li>
+ *        </ul>
+ *     </li>
  * </ul>
  *
  * <p>
  *     For the syntax of declaring a named group, <a href="https://stackoverflow.com/questions/415580/regex-named-groups-in-java">this stack overflow question should be useful.</a>
  * </p>
+ *
+ * @param <Ctx> The context that will be available for requests down the chain.
  */
 public final class RegexRouter<Ctx extends @Nullable Object> {
     private final List<Mapping<Ctx>> mappings;
@@ -54,19 +58,54 @@ public final class RegexRouter<Ctx extends @Nullable Object> {
         }
     }
 
-    public static <Ctx> Builder<Ctx> builder() {
+    /**
+     * Creates a {@link Builder}.
+     *
+     * @return A builder.
+     * @param <Ctx> The context for the router.
+     */
+    public static <Ctx extends @Nullable Object> Builder<Ctx> builder() {
         return new Builder<>();
     }
 
+    /**
+     * A simple handler that takes a request and produces a response.
+     */
     public interface Handler {
+        /**
+         * Handles the request.
+         * @param request The request.
+         * @return Something which can be turned into a {@link dev.mccue.rosie.Response}
+         */
         IntoResponse handle(Request request);
     }
 
-    public interface HandlerTakingContext<Ctx> {
+    /**
+     * Handler that takes a request and some additional context and produces a response.
+     * @param <Ctx> The additional context
+     */
+    public interface HandlerTakingContext<Ctx extends @Nullable Object> {
+        /**
+         * Handles the request.
+         * @param context Context to pass along..
+         * @param request The request.
+         * @return Something which can be turned into a {@link dev.mccue.rosie.Response}
+         */
         IntoResponse handle(Ctx context, Request request);
     }
 
-    public interface HandlerTakingContextAndRouteParams<Ctx> {
+    /**
+     * Handler that takes a request, some additional context, and any route params and produces a response.
+     * @param <Ctx> The additional context
+     */
+    public interface HandlerTakingContextAndRouteParams<Ctx extends @Nullable Object> {
+        /**
+         * Handles the request.
+         * @param context Context to pass along.
+         * @param routeParams Route params parsed from the request.
+         * @param request The request.
+         * @return Something which can be turned into a {@link dev.mccue.rosie.Response}
+         */
         IntoResponse handle(Ctx context, RouteParams routeParams, Request request);
     }
 
@@ -109,6 +148,12 @@ public final class RegexRouter<Ctx extends @Nullable Object> {
         }
     }
 
+    /**
+     * Handles the request if there is a matching handler.
+     * @param ctx The context to pass through.
+     * @param request The request to handle.
+     * @return A response, if a matching handler was found.
+     */
     public Optional<IntoResponse> handle(Ctx ctx, Request request) {
         for (final var mapping : this.mappings) {
             final var method = request.requestMethod();
@@ -125,17 +170,21 @@ public final class RegexRouter<Ctx extends @Nullable Object> {
         return Optional.empty();
     }
 
-    private record Mapping<Ctx>(
+    private record Mapping<Ctx extends @Nullable Object>(
             String method,
             Pattern routePattern,
             HandlerTakingContextAndRouteParams<Ctx> handler
     ) {}
-    private record MappingWithMethods<Ctx>(
+    private record MappingWithMethods<Ctx extends @Nullable Object>(
             Set<String> methods,
             Pattern routePattern,
             HandlerTakingContextAndRouteParams<Ctx> handler
     ) {}
 
+    /**
+     * A builder for {@link RegexRouter}.
+     * @param <Ctx> The context that will be available to requests.
+     */
     public static final class Builder<Ctx extends @Nullable Object> {
         private final List<MappingWithMethods<Ctx>> mappings;
 
@@ -143,6 +192,13 @@ public final class RegexRouter<Ctx extends @Nullable Object> {
             this.mappings = new ArrayList<>();
         }
 
+        /**
+         * Adds a mapping to the list of handlers.
+         * @param method The HTTP method to handle.
+         * @param routePattern The regex to match.
+         * @param handler The handler to use.
+         * @return The updated {@link Builder}
+         */
         public Builder<Ctx> addMapping(
                 String method,
                 Pattern routePattern,
@@ -152,6 +208,13 @@ public final class RegexRouter<Ctx extends @Nullable Object> {
             return this;
         }
 
+        /**
+         * Adds a mapping to the list of handlers.
+         * @param methods The HTTP methods to handle.
+         * @param routePattern The regex to match.
+         * @param handler The handler to use.
+         * @return The updated {@link Builder}
+         */
         public Builder<Ctx> addMapping(
                 Set<String> methods,
                 Pattern routePattern,
@@ -161,6 +224,13 @@ public final class RegexRouter<Ctx extends @Nullable Object> {
             return this;
         }
 
+        /**
+         * Adds a mapping to the list of handlers.
+         * @param method The HTTP method to handle.
+         * @param routePattern The regex to match.
+         * @param handler The handler to use.
+         * @return The updated {@link Builder}
+         */
         public Builder<Ctx> addMapping(
                 String method,
                 Pattern routePattern,
@@ -170,6 +240,13 @@ public final class RegexRouter<Ctx extends @Nullable Object> {
             return this;
         }
 
+        /**
+         * Adds a mapping to the list of handlers.
+         * @param methods The HTTP methods to handle.
+         * @param routePattern The regex to match.
+         * @param handler The handler to use.
+         * @return The updated {@link Builder}
+         */
         public Builder<Ctx> addMapping(
                 Set<String> methods,
                 Pattern routePattern,
@@ -179,6 +256,13 @@ public final class RegexRouter<Ctx extends @Nullable Object> {
             return this;
         }
 
+        /**
+         * Adds a mapping to the list of handlers.
+         * @param method The HTTP method to handle.
+         * @param routePattern The regex to match.
+         * @param handler The handler to use.
+         * @return The updated {@link Builder}
+         */
         public Builder<Ctx> addMapping(
                 String method,
                 Pattern routePattern,
@@ -188,6 +272,13 @@ public final class RegexRouter<Ctx extends @Nullable Object> {
             return this;
         }
 
+        /**
+         * Adds a mapping to the list of handlers.
+         * @param methods The HTTP methods to handle.
+         * @param routePattern The regex to match.
+         * @param handler The handler to use.
+         * @return The updated {@link Builder}
+         */
         public Builder<Ctx> addMapping(
                 Set<String> methods,
                 Pattern routePattern,
@@ -209,6 +300,10 @@ public final class RegexRouter<Ctx extends @Nullable Object> {
             return this;
         }
 
+        /**
+         * Builds the {@link RegexRouter}.
+         * @return The built router, ready to handle requests.
+         */
         public RegexRouter<Ctx> build() {
             return new RegexRouter<>(this);
         }
