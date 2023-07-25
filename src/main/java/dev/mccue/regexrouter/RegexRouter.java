@@ -2,6 +2,8 @@ package dev.mccue.regexrouter;
 
 import dev.mccue.rosie.IntoResponse;
 import dev.mccue.rosie.Request;
+import org.jspecify.annotations.Nullable;
+
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -12,22 +14,34 @@ import java.util.stream.Collectors;
 /**
  * Implementation of a Router that just does a linear scan through regexes.
  *
+ * <p>
  * This was chosen for my demo since it is the easiest thing to implement, not because it
  * is the most performant.
+ * </p>
  *
+ * <p>
  * That being said, this seems to be roughly how Django handles routing.
+ * </p>
  *
- * From @see <a href="https://docs.djangoproject.com/en/3.2/topics/http/urls/"></a>
+ * <p>
+ * From <a href="https://docs.djangoproject.com/en/3.2/topics/http/urls/">the django docs</a>
+ * </p>
  *
- * - Django runs through each URL pattern, in order, and stops at the first one that matches the requested URL, matching against path_info.
- * - Once one of the URL patterns matches, Django imports and calls the given view, which is a Python function (or a class-based view). The view gets passed the following arguments:
- *   - An instance of HttpRequest.
- *   - If the matched URL pattern contained no named groups, then the matches from the regular expression are provided as positional arguments.
- *   - The keyword arguments are made up of any named parts matched by the path expression that are provided, overridden by any arguments specified in the optional kwargs argument to django.urls.path() or django.urls.re_path().
+ * <ul>
+ *     <li>Django runs through each URL pattern, in order, and stops at the first one that matches the requested URL, matching against path_info.</li>
+ *     <li>Once one of the URL patterns matches, Django imports and calls the given view, which is a Python function (or a class-based view). The view gets passed the following arguments:</li>
+ *     <ul>
+ *         <li>An instance of HttpRequest.</li>
+ *         <li>If the matched URL pattern contained no named groups, then the matches from the regular expression are provided as positional arguments.</li>
+ *         <li>The keyword arguments are made up of any named parts matched by the path expression that are provided, overridden by any arguments specified in the optional kwargs argument to django.urls.path() or django.urls.re_path().</li>
+ *     </ul>
+ * </ul>
  *
- * https://stackoverflow.com/questions/415580/regex-named-groups-in-java
+ * <p>
+ *     For the syntax of declaring a named group, <a href="https://stackoverflow.com/questions/415580/regex-named-groups-in-java">this stack overflow question should be useful.</a>
+ * </p>
  */
-public final class RegexRouter<Ctx> {
+public final class RegexRouter<Ctx extends @Nullable Object> {
     private final List<Mapping<Ctx>> mappings;
 
     private RegexRouter(Builder<Ctx> builder) {
@@ -59,8 +73,10 @@ public final class RegexRouter<Ctx> {
     /**
      * Takes a matcher and provides an implementation of RouteParams on top of it.
      *
-     * Makes the assumption that it takes ownership of the matcher and will be exposed only via
-     * the interface, so the mutability of the matcher is not relevant.
+     * <p>
+     *     Makes the assumption that it takes ownership of the matcher and will be exposed only via
+     *     the interface, so the mutability of the matcher is not relevant.
+     * </p>
      */
     record MatcherRouteParams(Matcher matcher) implements RouteParams {
         @Override
@@ -120,7 +136,7 @@ public final class RegexRouter<Ctx> {
             HandlerTakingContextAndRouteParams<Ctx> handler
     ) {}
 
-    public static final class Builder<Ctx> {
+    public static final class Builder<Ctx extends @Nullable Object> {
         private final List<MappingWithMethods<Ctx>> mappings;
 
         private Builder() {
